@@ -1,57 +1,66 @@
 import {
-    Client,
-    AccountId,
     PrivateKey,
-    AccountBalanceQuery,
 } from '@hashgraph/sdk';
+import {
+    HDNode as ethersHdNode,
+} from '@ethersproject/hdnode';
 import dotenv from 'dotenv';
 
 async function main() {
     // Ensure required environment variables are available
     dotenv.config();
-    if (!process.env.ACCOUNT_ID ||
-        !process.env.ACCOUNT_PRIVATE_KEY) {
+    if (!process.env.SEED_PHRASE) {
         throw new Error('Please set required keys in .env file.');
     }
 
-    // Configure client using environment variables
-    const accountId = AccountId.fromString(process.env.ACCOUNT_ID);
-    const accountKey = PrivateKey.fromStringECDSA(process.env.ACCOUNT_PRIVATE_KEY);
-    // NOTE: Initialise account using `Client`
-    // Step (1) in the accompanying tutorial
-    // const client = Client.forTestnet().setOperator(/* ... */);
-    const client = Client.forTestnet().setOperator(accountId, accountKey);
+    // Create an ECSDA secp256k1 private key based on a BIP-39 seed phrase,
+    // plus the default BIP-32/BIP-44 HD Wallet derivation path used by Metamask.
+    const hdNodeRoot = ethersHdNode.fromMnemonic(process.env.SEED_PHRASE);
+    const accountHdPath = `m/44'/60'/0'/0/0`;
+    const hdNode = hdNodeRoot.derivePath(accountHdPath);
 
-    // Query tHBAR balance using AccountBalanceQuery,
-    // and convert to tinybars
-    // NOTE: Obtain the balance of the account
-    // Step (2) in the accompanying tutorial
-    // const accountBalance = /* ... */
-    const accountBalance = await new AccountBalanceQuery()
-        .setAccountId(accountId)
-        .execute(client);
-    // NOTE: Convert balance result object to Hbars
-    // Step (3) in the accompanying tutorial
-    // const accountBalanceHbars = /* ... */;
-    const accountBalanceHbars = accountBalance.hbars.toBigNumber();
-    const accountBalanceString = new Intl.NumberFormat('en-GB', {
-            minimumFractionDigits: 8,
-            maximumFractionDigits: 8,
-        })
-        .format(accountBalanceHbars);
+    // At this point the account technically does not yet exist,
+    // and will need to be created when it receives its first transaction (later).
+    // Convert the private key to string format as well as an EVM address.
+    const privateKey = PrivateKey.fromStringECDSA(hdNode.privateKey);
+    const privateKeyHex = `0x${privateKey.toStringRaw()}`;
+    const evmAddress = `0x${privateKey.publicKey.toEvmAddress()}`;
+    const accountExplorerUrl = `https://hashscan.io/testnet/account/${evmAddress}`;
+    const accountBalanceFetchApiUrl =
+        `https://testnet.mirrornode.hedera.com/api/v1/balances?account.id=${evmAddress}&limit=1&order=asc`;
 
-    // Output results
-    const accountExplorerUrl = `https://hashscan.io/testnet/account/${accountId}`;
-    console.log(`accountId: ${accountId}`);
-    console.log(`accountBalanceTinybars: ${accountBalanceString}`);
+    let accountBalanceTinybar;
+    let accountBalanceHbar;
+    let accountId;
+    try {
+        const accountBalanceFetch = await fetch(accountBalanceFetchApiUrl);
+        const accountBalanceJson = await accountBalanceFetch.json();
+        accountId = accountBalanceJson?.balances[0]?.account;
+        accountBalanceTinybar = accountBalanceJson?.balances[0]?.balance;
+        if (accountBalanceTinybar) {
+            accountBalanceHbar = new Intl.NumberFormat('en-GB', {
+                minimumFractionDigits: 8,
+                maximumFractionDigits: 8,
+            })
+            .format(accountBalanceTinybar * (10 ** -8));
+        }
+    } catch (ex) {
+        // do nothing
+    }
+
+    console.log(`privateKeyHex: ${privateKeyHex}`);
+    console.log(`evmAddress: ${evmAddress}`);
     console.log(`accountExplorerUrl: ${accountExplorerUrl}`);
-
-    client.close();
+    console.log(`accountId: ${accountId}`);
+    console.log(`accountBalanceHbar: ${accountBalanceHbar}`);
 
     return {
-        accountId,
-        accountBalanceString,
+        privateKeyHex,
+        evmAddress,
         accountExplorerUrl,
+        accountBalanceFetchApiUrl,
+        accountBalanceHbar,
+        accountBalanceTinybar,
     };
 }
 
