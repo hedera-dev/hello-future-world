@@ -1,3 +1,4 @@
+import * as url from 'node:url';
 import {
     PrivateKey,
 } from '@hashgraph/sdk';
@@ -64,6 +65,11 @@ async function main() {
     };
 }
 
-main();
+if (import.meta.url.startsWith('file:')) {
+    const modulePath = url.fileURLToPath(import.meta.url);
+    if (process.argv[1] === modulePath) {
+        main();
+    }
+}
 
 export default main;

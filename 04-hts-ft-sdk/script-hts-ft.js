@@ -20,7 +20,7 @@ async function main() {
     const accountId = AccountId.fromString(process.env.ACCOUNT_ID);
     const accountKey = PrivateKey.fromStringECDSA(process.env.ACCOUNT_PRIVATE_KEY);
     const client = Client.forTestnet().setOperator(accountId, accountKey);
- 
+
     // Create the token
     let tokenCreateTx = await new TokenCreateTransaction()
         // NOTE: Configure HTS token to be created
@@ -47,7 +47,7 @@ async function main() {
 
     client.close();
 
-    // Query token balance of acount (mirror node)
+    // Query token balance of account (mirror node)
     // need to wait 3 seconds for the record files to be ingested by the mirror nodes
     await new Promise((resolve) => setTimeout(resolve, 3000));
     // NOTE: Mirror Node API to query specified token balance
@@ -59,7 +59,7 @@ async function main() {
     const accountBalanceFetch = await fetch(accountBalanceFetchApiUrl);
     const accountBalanceJson = await accountBalanceFetch.json();
     const accountBalanceToken = accountBalanceJson?.tokens[0]?.balance;
-    
+
     // output results
     console.log(`accountId: ${accountId}`);
     console.log(`tokenId: ${tokenId}`);
@@ -76,6 +76,11 @@ async function main() {
     };
 }
 
-main();
+if (import.meta.url.startsWith('file:')) {
+    const modulePath = url.fileURLToPath(import.meta.url);
+    if (process.argv[1] === modulePath) {
+        main();
+    }
+}
 
 export default main;

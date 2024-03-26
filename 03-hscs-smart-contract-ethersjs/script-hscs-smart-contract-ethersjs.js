@@ -1,3 +1,4 @@
+import * as url from 'node:url';
 import fs from 'node:fs/promises';
 import { JsonRpcProvider } from '@ethersproject/providers';
 import { Wallet } from '@ethersproject/wallet';
@@ -15,7 +16,7 @@ async function main() {
     const rpcUrl = process.env.RPC_URL;
     const accountId = process.env.ACCOUNT_ID;
     const accountKey = process.env.ACCOUNT_PRIVATE_KEY;
-    
+
     // initialise account
     const rpcProvider = new JsonRpcProvider(
         rpcUrl,
@@ -79,6 +80,11 @@ async function main() {
     };
 }
 
-main();
+if (import.meta.url.startsWith('file:')) {
+    const modulePath = url.fileURLToPath(import.meta.url);
+    if (process.argv[1] === modulePath) {
+        main();
+    }
+}
 
 export default main;
